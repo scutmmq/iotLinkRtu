@@ -142,7 +142,6 @@ logs/
 *.h2.db
 
 # 缓存数据
-**/cache/
 **/data/cache/
 
 # 临时数据
@@ -190,7 +189,6 @@ yarn.lock
 # 项目特定
 # ===================================
 # 串口采集模块缓存
-iotLinkRtu-serai-collector/cache/
 iotLinkRtu-serai-collector/data/
 
 # RTU网关缓存
