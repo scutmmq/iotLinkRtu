@@ -10,7 +10,7 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>serai-collector</artifactId>
+    <artifactId>iotLinkRtu-serai-collector</artifactId>
     <packaging>jar</packaging>
 
     <name>Serial Collector Module</name>

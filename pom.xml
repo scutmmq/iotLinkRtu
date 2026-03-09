@@ -14,8 +14,8 @@
     <description>IoT RTU Communication System - Parent Project</description>
 
     <modules>
-        <module>serai-collector</module>
-        <module>rtu-gateway</module>
+        <module>iotLinkRtu-serai-collector</module>
+        <module>iotLinkRTu-rtu-gateway</module>
     </modules>
 
     <properties>

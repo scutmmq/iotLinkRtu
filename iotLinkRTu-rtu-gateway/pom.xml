@@ -10,7 +10,7 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>rtu-gateway</artifactId>
+    <artifactId>iotLinkRTu-rtu-gateway</artifactId>
     <packaging>jar</packaging>
 
     <name>RTU Gateway Module</name>
