@@ -8,6 +8,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.ByteBuffer;
@@ -81,22 +82,27 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
         log.info("收到认证请求: rtuId={}", rtuId);
 
         // TODO: 调用 web-server API 验证 rtuId 和 secretHash
+        // GET /api/rtu/gateway/{rtuId}/verify?secretHash=xxx
+        // 返回：{"valid": true, "status": "ENABLED"}
         // 这里暂时简单验证（实际应该调用 HTTP API）
-        boolean authSuccess = verifyAuth(rtuId, receivedHash);
+        AuthResult authResult = verifyAuth(rtuId, receivedHash);
 
-        // TODO 临时表示验证成功
-        authSuccess = true;
+        // TODO 临时通过验证
+        authResult.setStatus("ENABLED");
+        authResult.setValid(true);
 
-        if (authSuccess) {
+        if (authResult.isValid() && "ENABLED".equals(authResult.getStatus())) {
             // 注册连接
             connectionManager.register(rtuId, ctx.channel());
-            log.info("RTU {} 认证成功", rtuId);
+            log.info("RTU {} 认证成功并已启用", rtuId);
+            sendAuthResponse(ctx, true);
+        } else if (authResult.isValid() && "DISABLED".equals(authResult.getStatus())) {
+            log.warn("RTU {} 认证成功但已被禁用，拒绝连接", rtuId);
+            sendAuthResponse(ctx, false);
         } else {
             log.warn("RTU {} 认证失败", rtuId);
+            sendAuthResponse(ctx, false);
         }
-
-        // 发送认证响应
-        sendAuthResponse(ctx, authSuccess);
     }
 
     /**
@@ -152,12 +158,44 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
     /**
      * 验证认证信息（临时实现，实际应调用 web-server API）
      */
-    private boolean verifyAuth(String rtuId, byte[] receivedHash) {
+    private AuthResult verifyAuth(String rtuId, byte[] receivedHash) {
         // TODO: 调用 web-server API
         // GET /api/rtu/gateway/{rtuId}/verify?secretHash=xxx
+        // Response: {"valid": true, "status": "ENABLED"}
 
         // 临时实现：简单验证 rtuId 格式
-        return rtuId != null && rtuId.startsWith("RTU");
+        boolean valid = rtuId != null && rtuId.startsWith("RTU");
+        String status = valid ? "ENABLED" : "DISABLED";
+
+        return new AuthResult(valid, status);
+    }
+
+    /**
+     * 认证结果内部类
+     */
+    @Data
+    private static class AuthResult {
+        private  boolean valid;
+        private  String status;
+
+        public AuthResult(boolean valid, String status) {
+            this.valid = valid;
+            this.status = status;
+        }
+
+        public boolean isValid() {
+            return valid;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+        public void setValid(boolean valid) {
+            this.valid = valid;
+        }
+        public void setStatus(String status) {
+            this.status = status;
+        }
     }
 
     /**

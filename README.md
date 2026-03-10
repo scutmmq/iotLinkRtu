@@ -13,6 +13,8 @@ IoT Link RTU 是一个分布式物联网数据采集网关系统，采用 Maven 
 - 一对一架构：一个 RTU 对应一个串口，一个串口对应一个 Modbus 设备
 - 集中管理：统一的 RTU 网关注册、配置和监控
 - 高性能：全栈 Netty 实现，支持高并发
+- 上下线控制：支持远程启用/禁用 RTU 采集功能
+- 双数据库架构：PostgreSQL 存储管理数据，TDEngine 存储时序数据
 
 ## 系统架构
 
@@ -175,9 +177,24 @@ ent
 
 - JDK 17+
 - Maven 3.8+
-- MySQL 8.0+
+- PostgreSQL 12+（管理数据）
+- TDEngine 3.0+（时序数据）
 - MQTT Broker（EMQX 或 Mosquitto）
 - 串口设备（开发环境可使用虚拟串口）
+
+### 数据库架构
+
+本系统采用**双数据库架构**：
+
+**PostgreSQL**（关系型数据库）
+- 用途：存储管理类数据
+- 表：rtu_gateway、rtu_config、rtu_alarm
+- 特点：支持复杂查询和事务
+
+**TDEngine**（时序数据库）
+- 用途：存储时序采集数据
+- 表：rtu_data（超表）
+- 特点：高性能写入、高压缩比、自动分区
 
 ### 编译项目
 
@@ -212,18 +229,34 @@ docker run -d --name emqx \
 # 默认用户名/密码：admin/public
 ```
 
-#### 2. 启动 MySQL 数据库
+#### 2. 启动数据库
 
+**PostgreSQL**
 ```bash
-# 使用 Docker 启动 MySQL
-docker run -d --name mysql \
-  -p 3306:3306 \
-  -e MYSQL_ROOT_PASSWORD=root \
-  -e MYSQL_DATABASE=iot_rtu \
-  mysql:8.0
+# 使用 Docker 启动 PostgreSQL
+docker run -d --name postgres \
+  -p 5432:5432 \
+  -e POSTGRES_DB=iot_rtu \
+  -e POSTGRES_USER=iot_user \
+  -e POSTGRES_PASSWORD=iot_pass \
+  postgres:14
 
 # 导入数据库脚本
-mysql -h localhost -u root -p iot_rtu < doc/database.sql
+psql -h localhost -U iot_user -d iot_rtu < doc/schema_postgres.sql
+```
+
+**TDEngine**
+```bash
+# 使用 Docker 启动 TDEngine
+docker run -d --name tdengine \
+  -p 6030:6030 \
+  -p 6041:6041 \
+  -p 6043-6049:6043-6049 \
+  -p 6043-6049:6043-6049/udp \
+  tdengine/tdengine:3.2.0.0
+
+# 创建数据库和超级表
+taos -h localhost -P 6030 < doc/schema_tdengine.sql
 ```
 
 #### 3. 启动 rtu-gateway
@@ -394,13 +427,56 @@ git commit -m "test: 添加XXX测试"
 | Java | 17 | 开发语言 |
 | Maven | 3.8+ | 项目管理 |
 | Netty | 4.1.107 | 网络通信框架 |
-| jS2.10.4 | 串口通信 |
+| jSerialComm | 2.10.4 | 串口通信 |
 | Hutool | 5.8.26 | Java工具类库 |
 | Gson | 2.10.1 | JSON处理 |
 | Logback | 1.4.14 | 日志框架 |
 | JUnit 5 | 5.10.1 | 单元测试 |
-| MySQL | 8.0+ | 数据存储 |
+| PostgreSQL | 12+ | 管理数据存储 |
+| TDEngine | 3.0+ | 时序数据存储 |
 | MQTT | 3.1.1 | 消息队列 |
+
+## 核心功能
+
+### 上下线控制机制
+
+系统支持远程控制 RTU 的采集和上报功能：
+
+**状态字段**：
+- `status`：控制是否允许采集（ENABLED/DISABLED）
+- `online`：显示当前在线状态（ONLINE/OFFLINE）
+
+**控制流程**：
+1. 用户在 web 界面注册 RTU，默认 `status=ENABLED`
+2. RTU 连接并认证时，rtu-gateway 检查 `status` 字段
+3. 如果 `status=DISABLED`，拒绝认证，RTU 无法上报数据
+4. 如果 `status=ENABLED`，允许连接，设置 `online=ONLINE`
+5. 用户可以在 web 界面修改 `status` 来远程启用/禁用 RTU
+
+**使用场景**：
+- 设备维护时临时禁用数据采集
+- 异常设备的远程隔离
+- 分批次启用新设备
+
+### 双数据库架构
+
+**数据分离存储**：
+```
+采集数据流
+    ↓
+web-server
+    ├─→ PostgreSQL（管理数据）
+    │   - rtu_gateway：RTU 注册信息
+    │   - rtu_config：配置参数
+    │   - rtu_alarm：报警记录
+    │
+    └─→ TDEngine（时序数据）
+        - rtu_data：温湿度采集数据
+```
+
+**优势**：
+- PostgreSQL：支持复杂查询、事务、关联查询
+- TDEngine：高性能写入（百万级/秒）、高压缩比（1/10）、自动分区
 
 ## 性能指标
 
