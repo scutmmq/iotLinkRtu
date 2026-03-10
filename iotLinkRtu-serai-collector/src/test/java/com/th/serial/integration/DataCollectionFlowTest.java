@@ -1,7 +1,7 @@
-package com.th.serial.integration;
+package com.scutmmq.integration;
 
-import com.th.serial.protocol.BinaryProtocol;
-import com.th.serial.protocol.ModbusProtocol;
+import com.scutmmq.protocol.BinaryProtocol;
+import com.scutmmq.protocol.ModbusProtocol;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 

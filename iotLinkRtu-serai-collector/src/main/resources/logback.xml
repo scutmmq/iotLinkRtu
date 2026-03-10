@@ -6,7 +6,7 @@
         </encoder>
     </appender>
 
-    <logger name="com.th.serial" level="DEBUG" />
+    <logger name="com.scutmmq" level="DEBUG" />
 
     <root level="info">
         <appender-ref ref="STDOUT" />

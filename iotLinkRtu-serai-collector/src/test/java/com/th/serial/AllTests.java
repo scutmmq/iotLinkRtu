@@ -1,4 +1,4 @@
-package com.th.serial;
+package com.scutmmq;
 
 import org.junit.platform.suite.api.SelectPackages;
 import org.junit.platform.suite.api.Suite;
@@ -10,10 +10,10 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @Suite
 @SuiteDisplayName("Serial Collector 完整测试套件")
 @SelectPackages({
-    "com.th.serial.protocol",
-    "com.th.serial.utils",
-    "com.th.serial.cache",
-    "com.th.serial.integration"
+    "com.scutmmq.protocol",
+    "com.scutmmq.utils",
+    "com.scutmmq.cache",
+    "com.scutmmq.integration"
 })
 public class AllTests {
     // 测试套件入口

@@ -9,6 +9,7 @@
         <outputRelativeToContentRoot value="true" />
         <module name="iotLinkRTu-rtu-gateway" />
         <module name="iotLinkRtu-serai-collector" />
+        <module name="common-modules" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="17" />

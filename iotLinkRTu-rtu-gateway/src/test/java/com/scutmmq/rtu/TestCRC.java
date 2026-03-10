@@ -1,6 +1,6 @@
-package com.scutmmq.rtu;
+package com.scutmmq;
 
-import com.scutmmq.rtu.utils.ModBusUtil;
+import com.scutmmq.utils.ModBusUtil;
 
 class TestCRC {
     public static void main(String[] args) {

@@ -16,7 +16,7 @@
 
 ## 配置参数
 
-目前配置参数在代码中可以修改 (`com.th.serial.service.DataForwarderService`):
+目前配置参数在代码中可以修改 (`com.scutmmq.service.DataForwarderService`):
 
 - 串口号: `COM3` (默认)
 - 波特率: `9600`
@@ -37,8 +37,8 @@
 
 ## 项目结构
 
-- `com.th.serial.manager`: 串口管理层
-- `com.th.serial.client`: Netty TCP客户端
-- `com.th.serial.service`: 业务逻辑层（轮询 scheduler）
-- `com.th.serial.utils`: 工具类 (CRC16)
+- `com.scutmmq.manager`: 串口管理层
+- `com.scutmmq.client`: Netty TCP客户端
+- `com.scutmmq.service`: 业务逻辑层（轮询 scheduler）
+- `com.scutmmq.utils`: 工具类 (CRC16)
 

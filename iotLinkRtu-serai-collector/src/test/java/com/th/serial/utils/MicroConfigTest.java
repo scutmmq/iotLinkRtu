@@ -1,4 +1,4 @@
-package com.th.serial.utils;
+package com.scutmmq.utils;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

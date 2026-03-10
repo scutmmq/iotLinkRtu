@@ -1,7 +1,7 @@
-package com.scutmmq.rtu;
+package com.scutmmq;
 
-import com.scutmmq.rtu.codec.ModBusCodec;
-import com.scutmmq.rtu.hanlder.ModBusClientHandler;
+import com.scutmmq.codec.ModBusCodec;
+import com.scutmmq.hanlder.ModBusClientHandler;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.logging.LogLevel;

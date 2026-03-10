@@ -1,6 +1,6 @@
-package com.th.serial.cache;
+package com.scutmmq.cache;
 
-import com.th.serial.protocol.BinaryProtocol;
+import com.scutmmq.protocol.BinaryProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
