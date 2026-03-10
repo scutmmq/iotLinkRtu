@@ -162,6 +162,12 @@ public class GatewayClient {
     public void stop() {
         isRunning = false;
         stopHeartbeat();
+
+        // 优雅关闭缓存管理器
+        if (cacheManager != null) {
+            cacheManager.shutdown();
+        }
+
         if (group != null) {
             group.shutdownGracefully();
         }

@@ -8,10 +8,13 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="iotLinkRTu-rtu-gateway" />
+        <module name="iotLinkRtu-common-modules" />
         <module name="iotLinkRtu-serai-collector" />
-        <module name="common-modules" />
+        <module name="iotiLinkRtu-web-server" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel target="17" />
+    <bytecodeTargetLevel target="17">
+      <module name="web-server" target="17" />
+    </bytecodeTargetLevel>
   </component>
 </project>

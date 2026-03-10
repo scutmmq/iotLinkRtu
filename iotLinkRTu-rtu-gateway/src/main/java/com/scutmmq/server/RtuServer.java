@@ -2,6 +2,8 @@ package com.scutmmq.server;
 
 import com.scutmmq.handler.BinaryFrameHandler;
 import com.scutmmq.manager.RtuConnectionManager;
+import com.scutmmq.mqtt.MqttClientManager;
+import com.scutmmq.mqtt.MqttPublisher;
 import com.scutmmq.protocol.BinaryFrameDecoder;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
@@ -55,6 +57,16 @@ public class RtuServer {
     private final RtuConnectionManager connectionManager;
 
     /**
+     * MQTT 客户端管理器
+     */
+    private final MqttClientManager mqttClientManager;
+
+    /**
+     * MQTT 消息发布器
+     */
+    private final MqttPublisher mqttPublisher;
+
+    /**
      * 带参数的构造函数
      *
      * @param port 服务器监听端口号
@@ -62,6 +74,8 @@ public class RtuServer {
     public RtuServer(int port) {
         this.port = port;
         this.connectionManager = new RtuConnectionManager();
+        this.mqttClientManager = new MqttClientManager();
+        this.mqttPublisher = new MqttPublisher(mqttClientManager);
     }
 
     /**
@@ -73,6 +87,10 @@ public class RtuServer {
      * @throws InterruptedException 当服务器启动或运行被中断时抛出
      */
     public void start() throws InterruptedException {
+        // 启动 MQTT 客户端
+        log.info("正在启动 MQTT 客户端...");
+        mqttClientManager.start();
+
         bossGroup = new NioEventLoopGroup(1);
         workerGroup = new NioEventLoopGroup(4);
 
@@ -91,8 +109,8 @@ public class RtuServer {
                                     .addLast(new IdleStateHandler(60, 0, 0, TimeUnit.SECONDS))
                                     // 二进制帧解码器
                                     .addLast(new BinaryFrameDecoder())
-                                    // 业务逻辑处理器
-                                    .addLast(new BinaryFrameHandler(connectionManager));
+                                    // 业务逻辑处理器（注入 MQTT 发布器）
+                                    .addLast(new BinaryFrameHandler(connectionManager, mqttPublisher));
                         }
                     });
 
@@ -131,6 +149,11 @@ public class RtuServer {
 
         if (bossGroup != null) {
             bossGroup.shutdownGracefully();
+        }
+
+        // 关闭 MQTT 客户端
+        if (mqttClientManager != null) {
+            mqttClientManager.stop();
         }
 
         log.info("RTU Gateway Server 已完全关闭");

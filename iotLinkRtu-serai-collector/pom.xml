@@ -58,7 +58,7 @@
         </dependency>
         <dependency>
             <groupId>com.scutmmq</groupId>
-            <artifactId>common-modules</artifactId>
+            <artifactId>iotLinkRtu-common-modules</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
     </dependencies>

@@ -16,7 +16,8 @@
     <modules>
         <module>iotLinkRtu-serai-collector</module>
         <module>iotLinkRTu-rtu-gateway</module>
-        <module>common-modules</module>
+        <module>iotLinkRtu-common-modules</module>
+        <module>iotiLinkRtu-web-server</module>
     </modules>
 
     <properties>

@@ -29,8 +29,35 @@ public class Config {
     public static final String mqttClientIdPrefix = MicroConfig.readString("mqtt.client.id.prefix", "rtu-gateway");
 
     /**
+     * MQTT 用户名（可选）
+     */
+    public static final String mqttUsername = MicroConfig.readString("mqtt.username", null);
+
+    /**
+     * MQTT 密码（可选）
+     */
+    public static final String mqttPassword = MicroConfig.readString("mqtt.password", null);
+
+    /**
      * Web Server API 地址
      * <p>用于验证 RTU 认证</p>
      */
     public static final String webServerApiUrl = MicroConfig.readString("web.server.api.url", "http://localhost:8080");
+
+    // Getter 方法（供 MQTT 客户端使用）
+    public static String getMqttBrokerUrl() {
+        return mqttBrokerUrl;
+    }
+
+    public static String getMqttClientId() {
+        return mqttClientIdPrefix;
+    }
+
+    public static String getMqttUsername() {
+        return mqttUsername;
+    }
+
+    public static String getMqttPassword() {
+        return mqttPassword;
+    }
 }

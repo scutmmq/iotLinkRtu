@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 2026-03-10
  */
 @Slf4j
-public class RtuConnectionManager {
+public class  RtuConnectionManager {
 
     /**
      * rtuId → Channel 映射（用于配置下发时查找 channel）

@@ -1,6 +1,7 @@
 package com.scutmmq.handler;
 
 import com.scutmmq.manager.RtuConnectionManager;
+import com.scutmmq.mqtt.MqttPublisher;
 import com.scutmmq.parser.ModBusDataParser;
 import com.scutmmq.protocol.BinaryFrame;
 import com.scutmmq.protocol.BinaryProtocol;
@@ -27,9 +28,11 @@ import java.nio.charset.StandardCharsets;
 public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame> {
 
     private final RtuConnectionManager connectionManager;
+    private final MqttPublisher mqttPublisher;
 
-    public BinaryFrameHandler(RtuConnectionManager connectionManager) {
+    public BinaryFrameHandler(RtuConnectionManager connectionManager, MqttPublisher mqttPublisher) {
         this.connectionManager = connectionManager;
+        this.mqttPublisher = mqttPublisher;
     }
 
     @Override
@@ -96,6 +99,10 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
             connectionManager.register(rtuId, ctx.channel());
             log.info("RTU {} 认证成功并已启用", rtuId);
             sendAuthResponse(ctx, true);
+
+            // 发布上线通知到 MQTT
+            mqttPublisher.publishOnlineNotification(rtuId);
+            mqttPublisher.publishStatusChange(rtuId, "offline", "online", "authentication_success", "RTU认证成功并上线");
         } else if (authResult.isValid() && "DISABLED".equals(authResult.getStatus())) {
             log.warn("RTU {} 认证成功但已被禁用，拒绝连接", rtuId);
             sendAuthResponse(ctx, false);
@@ -237,8 +244,12 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
 
                 log.info("RTU {} - 温度: {}℃, 湿度: {}%RH", rtuId, temperature, humidity);
 
-                // TODO: 发布到 MQTT
-                // publishToMqtt(rtuId, temperature, humidity);
+                // 发布到 MQTT
+                String rawModbusHex = bytesToHex(modbusData);
+                mqttPublisher.publishDataReport(rtuId, temperature, humidity, address, functionCode, rawModbusHex);
+
+                // 检查阈值并发送报警
+                checkThresholdAndAlarm(rtuId, temperature, humidity);
             }
 
         } catch (Exception e) {
@@ -246,10 +257,58 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
         }
     }
 
+    /**
+     * 检查阈值并发送报警
+     */
+    private void checkThresholdAndAlarm(String rtuId, float temperature, float humidity) {
+        // TODO: 从配置中读取阈值，这里使用硬编码示例
+        float tempMin = 18.0f;
+        float tempMax = 28.0f;
+        float humidityMin = 40.0f;
+        float humidityMax = 60.0f;
+
+        if (temperature > tempMax) {
+            mqttPublisher.publishAlarm(rtuId, "temperature_high", "warning",
+                temperature, tempMax, "温度超过上限阈值", "请检查空调设备");
+        } else if (temperature < tempMin) {
+            mqttPublisher.publishAlarm(rtuId, "temperature_low", "warning",
+                temperature, tempMin, "温度低于下限阈值", "请检查加热设备");
+        }
+
+        if (humidity > humidityMax) {
+            mqttPublisher.publishAlarm(rtuId, "humidity_high", "warning",
+                humidity, humidityMax, "湿度超过上限阈值", "请检查除湿设备");
+        } else if (humidity < humidityMin) {
+            mqttPublisher.publishAlarm(rtuId, "humidity_low", "warning",
+                humidity, humidityMin, "湿度低于下限阈值", "请检查加湿设备");
+        }
+    }
+
+    /**
+     * 字节数组转十六进制字符串
+     */
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
+    }
+
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        // 获取 RTU ID
+        String rtuId = connectionManager.getRtuId(ctx.channel());
+
         // 连接断开，注销
         connectionManager.unregister(ctx.channel());
+
+        // 发布离线通知到 MQTT
+        if (rtuId != null) {
+            mqttPublisher.publishOfflineNotification(rtuId);
+            mqttPublisher.publishStatusChange(rtuId, "online", "offline", "connection_lost", "TCP连接断开");
+        }
+
         super.channelInactive(ctx);
     }
 
