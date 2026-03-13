@@ -2,6 +2,7 @@ package com.scutmmq;
 
 import com.scutmmq.restful.RestFulExpress;
 import com.scutmmq.restful.HttpServer;
+import com.scutmmq.web.controller.config.HttpServerConfig;
 import com.scutmmq.web.controller.rtu.RtuRegisterController;
 import com.scutmmq.web.controller.rtu.RtuListController;
 import com.scutmmq.web.controller.rtu.RtuController;
@@ -45,6 +46,6 @@ public class Application {
         
         // 2. 启动 HTTP 服务器（默认端口 8080）
         System.out.println("正在启动 Web Server...");
-        new HttpServer(8080).start();
+        new HttpServer(HttpServerConfig.port).start();
     }
 }
