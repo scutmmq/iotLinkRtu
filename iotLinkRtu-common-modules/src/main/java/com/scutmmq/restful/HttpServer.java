@@ -11,7 +11,9 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class HttpServer {
 
     private final Integer port;
@@ -26,7 +28,7 @@ public class HttpServer {
         this.port = port;
     }
 
-    private void start(){
+    public void start(){
         boss = new NioEventLoopGroup(1);
         worker = new NioEventLoopGroup(3);
 
@@ -52,6 +54,9 @@ public class HttpServer {
                         }
                     });
             ChannelFuture channelFuture = bootstrap.bind(port);
+
+            log.info("HTTP Server 启动成功，监听端口: {}", port);
+
 
             // 阻塞主线程，直到服务器 Channel 关闭
             channelFuture.channel().closeFuture().sync();

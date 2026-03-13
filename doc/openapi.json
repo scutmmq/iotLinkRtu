@@ -1,0 +1,1545 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "物联网 RTU 网关系统 API",
+    "description": "物联网 RTU 网关系统的 RESTful API 接口文档，包括 RTU 设备管理、数据查询、配置下发、报警管理等功能\n\n**系统架构**: serial-collector(边缘采集) ↔ rtu-gateway(协议转换) ↔ MQTT Broker ↔ web-server(业务服务)",
+    "version": "2.0.0",
+    "contact": {
+      "name": "mo.mingqin@xlink"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "本地开发环境"
+    },
+    {
+      "url": "http://192.168.1.100:8080",
+      "description": "生产环境"
+    }
+  ],
+  "tags": [
+    {
+      "name": "RTU 管理",
+      "description": "RTU 设备注册、查询、更新、删除等操作"
+    },
+    {
+      "name": "数据查询",
+      "description": "实时数据、历史数据、统计数据查询"
+    },
+    {
+      "name": "配置管理",
+      "description": "RTU 配置查询和下发"
+    },
+    {
+      "name": "报警管理",
+      "description": "报警列表查询和处理"
+    }
+  ],
+  "paths": {
+    "/api/rtu/register": {
+      "post": {
+        "tags": ["RTU 管理"],
+        "summary": "RTU 设备注册",
+        "description": "注册新的 RTU 设备到系统中",
+        "operationId": "registerRtu",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RtuRegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "注册成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RtuRegisterResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "rtuAlreadyExists": {
+                    "summary": "RTU 已存在",
+                    "value": {
+                      "code": 1002,
+                      "message": "RTU 已存在"
+                    }
+                  },
+                  "rtuIdEmpty": {
+                    "summary": "RTU ID 不能为空",
+                    "value": {
+                      "code": 1006,
+                      "message": "RTU ID 不能为空"
+                    }
+                  },
+                  "rtuNameEmpty": {
+                    "summary": "RTU 名称不能为空",
+                    "value": {
+                      "code": 1007,
+                      "message": "RTU 名称不能为空"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rtu/list": {
+      "get": {
+        "tags": ["RTU 管理"],
+        "summary": "RTU 设备列表查询",
+        "description": "分页查询 RTU 设备列表，支持条件过滤",
+        "operationId": "listRtus",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "每页数量",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "状态过滤",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["online", "offline"]
+            }
+          },
+          {
+            "name": "rtuId",
+            "in": "query",
+            "description": "RTU ID 模糊查询",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RtuListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalidStatus": {
+                    "summary": "无效的 RTU 状态",
+                    "value": {
+                      "code": 1008,
+                      "message": "无效的 RTU 状态"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rtu/{rtuId}": {
+      "get": {
+        "tags": ["RTU 管理"],
+        "summary": "RTU 设备详情查询",
+        "description": "根据 RTU ID 查询单个 RTU 设备的详细信息",
+        "operationId": "getRtuDetail",
+        "parameters": [
+          {
+            "name": "rtuId",
+            "in": "path",
+            "description": "RTU 唯一标识",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RtuDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "RTU 不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1001,
+                  "message": "RTU 不存在"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["RTU 管理"],
+        "summary": "RTU 设备更新",
+        "description": "更新 RTU 设备信息",
+        "operationId": "updateRtu",
+        "parameters": [
+          {
+            "name": "rtuId",
+            "in": "path",
+            "description": "RTU 唯一标识",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RtuUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RtuUpdateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "rtuNotFound": {
+                    "summary": "RTU 不存在",
+                    "value": {
+                      "code": 1001,
+                      "message": "RTU 不存在"
+                    }
+                  },
+                  "rtuConfigError": {
+                    "summary": "RTU 配置错误",
+                    "value": {
+                      "code": 1005,
+                      "message": "RTU 配置错误"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["RTU 管理"],
+        "summary": "RTU 设备删除",
+        "description": "删除指定的 RTU 设备 (仅允许删除离线设备)",
+        "operationId": "deleteRtu",
+        "parameters": [
+          {
+            "name": "rtuId",
+            "in": "path",
+            "description": "RTU 唯一标识",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RtuDeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "RTU 不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1001,
+                  "message": "RTU 不存在"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "不允许删除在线设备",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "RTU 在线，不允许删除"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rtu/gateway/verify": {
+      "post": {
+        "tags": ["RTU 管理"],
+        "summary": "RTU 认证验证",
+        "description": "rtu-gateway 接收到 serial-collector 的认证请求后，调用此接口验证 RTU 合法性",
+        "operationId": "verifyRtu",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RtuVerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "认证成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RtuVerifyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "认证失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 401,
+                  "message": "认证失败：RTU 不存在或密钥错误",
+                  "data": {
+                    "valid": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rtu/{rtuId}/config": {
+      "post": {
+        "tags": ["配置管理"],
+        "summary": "配置下发",
+        "description": "向 RTU 设备下发配置信息 (异步操作)",
+        "operationId": "updateRtuConfig",
+        "parameters": [
+          {
+            "name": "rtuId",
+            "in": "path",
+            "description": "RTU 唯一标识",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RtuConfigRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "配置更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RtuConfigResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "rtuOffline": {
+                    "summary": "RTU 离线",
+                    "value": {
+                      "code": 1003,
+                      "message": "RTU 离线，无法下发配置"
+                    }
+                  },
+                  "invalidInterval": {
+                    "summary": "采样间隔无效",
+                    "value": {
+                      "code": 3003,
+                      "message": "采样间隔无效 (1-60 秒)"
+                    }
+                  },
+                  "tempThresholdError": {
+                    "summary": "温度阈值错误",
+                    "value": {
+                      "code": 3005,
+                      "message": "温度最小值不能大于最大值"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/realtime": {
+      "get": {
+        "tags": ["数据查询"],
+        "summary": "实时数据查询",
+        "description": "查询 RTU 设备的实时温湿度数据",
+        "operationId": "getRealtimeData",
+        "parameters": [
+          {
+            "name": "rtuId",
+            "in": "query",
+            "description": "RTU 唯一标识",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RealtimeDataResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "dataNotFound": {
+                    "summary": "数据不存在",
+                    "value": {
+                      "code": 2001,
+                      "message": "数据不存在"
+                    }
+                  },
+                  "temperatureOutOfRange": {
+                    "summary": "温度值超出范围",
+                    "value": {
+                      "code": 2005,
+                      "message": "温度值超出范围 (-40~85°C)"
+                    }
+                  },
+                  "humidityOutOfRange": {
+                    "summary": "湿度值超出范围",
+                    "value": {
+                      "code": 2006,
+                      "message": "湿度值超出范围 (0~100%)"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/history": {
+      "get": {
+        "tags": ["数据查询"],
+        "summary": "历史数据查询",
+        "description": "查询 RTU 设备的历史数据，支持时间范围过滤和分页",
+        "operationId": "getHistoryData",
+        "parameters": [
+          {
+            "name": "rtuId",
+            "in": "query",
+            "description": "RTU 唯一标识",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startTime",
+            "in": "query",
+            "description": "开始时间",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endTime",
+            "in": "query",
+            "description": "结束时间",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "每页数量",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "maximum": 1000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryDataResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/statistics": {
+      "get": {
+        "tags": ["数据查询"],
+        "summary": "统计数据查询",
+        "description": "查询 RTU 设备在指定时间范围内的统计数据 (平均值、最大值、最小值)",
+        "operationId": "getStatisticsData",
+        "parameters": [
+          {
+            "name": "rtuId",
+            "in": "query",
+            "description": "RTU 唯一标识",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startTime",
+            "in": "query",
+            "description": "开始时间",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endTime",
+            "in": "query",
+            "description": "结束时间",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatisticsDataResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarm/list": {
+      "get": {
+        "tags": ["报警管理"],
+        "summary": "报警列表查询",
+        "description": "查询报警记录列表，支持条件过滤和分页",
+        "operationId": "listAlarms",
+        "parameters": [
+          {
+            "name": "rtuId",
+            "in": "query",
+            "description": "RTU ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "处理状态",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["unhandled", "handled"]
+            }
+          },
+          {
+            "name": "alarmType",
+            "in": "query",
+            "description": "报警类型",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["temperature_high", "temperature_low", "humidity_high", "humidity_low"]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "每页数量",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlarmListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarm/{alarmId}/handle": {
+      "put": {
+        "tags": ["报警管理"],
+        "summary": "报警处理",
+        "description": "处理指定的报警记录",
+        "operationId": "handleAlarm",
+        "parameters": [
+          {
+            "name": "alarmId",
+            "in": "path",
+            "description": "报警记录 ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlarmHandleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "处理成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlarmHandleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "alarmNotFound": {
+                    "summary": "报警记录不存在",
+                    "value": {
+                      "code": 4001,
+                      "message": "报警记录不存在"
+                    }
+                  },
+                  "alarmAlreadyHandled": {
+                    "summary": "报警已处理",
+                    "value": {
+                      "code": 4002,
+                      "message": "报警已处理"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "RtuRegisterRequest": {
+        "type": "object",
+        "required": ["rtuId", "name", "serialPort"],
+        "properties": {
+          "rtuId": {
+            "type": "string",
+            "description": "RTU 唯一标识，全局唯一",
+            "example": "RTU-001"
+          },
+          "name": {
+            "type": "string",
+            "description": "RTU 名称，1-64 字符",
+            "example": "1 号温湿度采集器"
+          },
+          "location": {
+            "type": "string",
+            "description": "安装位置",
+            "example": "机房 A 区"
+          },
+          "serialPort": {
+            "type": "string",
+            "description": "串口号",
+            "example": "COM3"
+          },
+          "baudRate": {
+            "type": "integer",
+            "description": "波特率",
+            "default": 9600,
+            "minimum": 1200,
+            "maximum": 115200,
+            "example": 9600
+          },
+          "deviceAddress": {
+            "type": "integer",
+            "description": "Modbus 设备地址",
+            "default": 1,
+            "minimum": 1,
+            "maximum": 255,
+            "example": 1
+          },
+          "samplingInterval": {
+            "type": "integer",
+            "description": "采集间隔 (秒)",
+            "default": 1,
+            "minimum": 1,
+            "example": 1
+          }
+        }
+      },
+      "RtuRegisterResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "注册成功"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RtuDetail"
+          }
+        }
+      },
+      "RtuListResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "查询成功"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "example": 25
+              },
+              "list": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RtuListItem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RtuListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "rtuId": {
+            "type": "string",
+            "example": "RTU-001"
+          },
+          "name": {
+            "type": "string",
+            "example": "1 号温湿度采集器"
+          },
+          "location": {
+            "type": "string",
+            "example": "机房 A 区"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["online", "offline"],
+            "example": "online"
+          },
+          "lastOnlineTime": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-03-13 10:30:00"
+          },
+          "serialPort": {
+            "type": "string",
+            "example": "COM3"
+          },
+          "baudRate": {
+            "type": "integer",
+            "example": 9600
+          },
+          "samplingInterval": {
+            "type": "integer",
+            "example": 1
+          }
+        }
+      },
+      "RtuUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "RTU 名称"
+          },
+          "location": {
+            "type": "string",
+            "description": "安装位置"
+          },
+          "samplingInterval": {
+            "type": "integer",
+            "description": "采集间隔 (秒)"
+          }
+        }
+      },
+      "RtuUpdateResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "更新成功"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "example": 1
+              },
+              "rtuId": {
+                "type": "string",
+                "example": "RTU-001"
+              },
+              "name": {
+                "type": "string",
+                "example": "1 号温湿度采集器 (已更新)"
+              },
+              "location": {
+                "type": "string",
+                "example": "机房 B 区"
+              },
+              "samplingInterval": {
+                "type": "integer",
+                "example": 5
+              },
+              "updateTime": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-03-13 11:00:00"
+              }
+            }
+          }
+        }
+      },
+      "RtuDetailResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "查询成功"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RtuDetail"
+          }
+        }
+      },
+      "RtuDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "删除成功"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "deleted": {
+                "type": "boolean",
+                "example": true
+              },
+              "rtuId": {
+                "type": "string",
+                "example": "RTU-001"
+              }
+            }
+          }
+        }
+      },
+      "RtuVerifyRequest": {
+        "type": "object",
+        "required": ["rtuId", "secretHash"],
+        "properties": {
+          "rtuId": {
+            "type": "string",
+            "description": "RTU 唯一标识"
+          },
+          "secretHash": {
+            "type": "string",
+            "description": "secret 的 SHA-256 哈希值"
+          }
+        }
+      },
+      "RtuVerifyResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "认证成功"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "valid": {
+                "type": "boolean",
+                "example": true
+              },
+              "status": {
+                "type": "string",
+                "example": "ENABLED"
+              },
+              "rtuId": {
+                "type": "string",
+                "example": "RTU-001"
+              }
+            }
+          }
+        }
+      },
+      "RtuConfigRequest": {
+        "type": "object",
+        "properties": {
+          "samplingInterval": {
+            "type": "integer",
+            "description": "采集间隔 (秒)",
+            "minimum": 1,
+            "maximum": 60,
+            "example": 5
+          },
+          "temperatureThreshold": {
+            "type": "object",
+            "properties": {
+              "min": {
+                "type": "number",
+                "format": "float",
+                "example": 18.0
+              },
+              "max": {
+                "type": "number",
+                "format": "float",
+                "example": 28.0
+              }
+            }
+          },
+          "humidityThreshold": {
+            "type": "object",
+            "properties": {
+              "min": {
+                "type": "number",
+                "format": "float",
+                "example": 40.0
+              },
+              "max": {
+                "type": "number",
+                "format": "float",
+                "example": 60.0
+              }
+            }
+          },
+          "alarmEnabled": {
+            "type": "boolean",
+            "default": true,
+            "example": true
+          }
+        }
+      },
+      "RtuConfigResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "配置更新成功，已下发到 RTU"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "rtuId": {
+                "type": "string",
+                "example": "RTU-001"
+              },
+              "configStatus": {
+                "type": "string",
+                "example": "pending"
+              },
+              "updateTime": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      },
+      "RealtimeDataResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "查询成功"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "rtuId": {
+                "type": "string",
+                "example": "RTU-001"
+              },
+              "deviceId": {
+                "type": "string",
+                "example": "RTU-001"
+              },
+              "temperature": {
+                "type": "number",
+                "format": "float",
+                "description": "温度值 (℃)",
+                "example": 25.0
+              },
+              "humidity": {
+                "type": "number",
+                "format": "float",
+                "description": "湿度值 (%RH)",
+                "example": 50.0
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-03-13 10:30:00"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["normal", "warning", "error"],
+                "example": "normal"
+              }
+            }
+          }
+        }
+      },
+      "HistoryDataResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "查询成功"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "example": 86400
+              },
+              "list": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/HistoryDataItem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "HistoryDataItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "rtuId": {
+            "type": "string",
+            "example": "RTU-001"
+          },
+          "deviceId": {
+            "type": "string",
+            "example": "RTU-001"
+          },
+          "temperature": {
+            "type": "number",
+            "format": "float",
+            "example": 25.0
+          },
+          "humidity": {
+            "type": "number",
+            "format": "float",
+            "example": 50.0
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-03-13 10:30:00"
+          },
+          "rawModbus": {
+            "type": "string",
+            "description": "Modbus 原始数据",
+            "example": "0103040FA01F4XXXX"
+          }
+        }
+      },
+      "StatisticsDataResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "查询成功"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "rtuId": {
+                "type": "string",
+                "example": "RTU-001"
+              },
+              "temperature": {
+                "type": "object",
+                "properties": {
+                  "avg": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 25.5
+                  },
+                  "max": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 30.0
+                  },
+                  "min": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 20.0
+                  }
+                }
+              },
+              "humidity": {
+                "type": "object",
+                "properties": {
+                  "avg": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 50.5
+                  },
+                  "max": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 60.0
+                  },
+                  "min": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 40.0
+                  }
+                }
+              },
+              "dataCount": {
+                "type": "integer",
+                "example": 86400
+              }
+            }
+          }
+        }
+      },
+      "AlarmListResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "查询成功"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "example": 5
+              },
+              "list": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AlarmItem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AlarmItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "rtuId": {
+            "type": "string",
+            "example": "RTU-001"
+          },
+          "alarmType": {
+            "type": "string",
+            "enum": ["temperature_high", "temperature_low", "humidity_high", "humidity_low"],
+            "example": "temperature_high"
+          },
+          "alarmLevel": {
+            "type": "string",
+            "enum": ["info", "warning", "error"],
+            "example": "warning"
+          },
+          "currentValue": {
+            "type": "number",
+            "format": "float",
+            "example": 32.0
+          },
+          "thresholdValue": {
+            "type": "number",
+            "format": "float",
+            "example": 28.0
+          },
+          "alarmTime": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-03-13 10:30:00"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["unhandled", "handled"],
+            "example": "unhandled"
+          }
+        }
+      },
+      "AlarmHandleRequest": {
+        "type": "object",
+        "required": ["handleResult", "handler"],
+        "properties": {
+          "handleResult": {
+            "type": "string",
+            "description": "处理结果描述",
+            "example": "已调整空调温度"
+          },
+          "handler": {
+            "type": "string",
+            "description": "处理人",
+            "example": "张三"
+          }
+        }
+      },
+      "AlarmHandleResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "报警处理成功"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "example": 1
+              },
+              "status": {
+                "type": "string",
+                "example": "handled"
+              },
+              "handleResult": {
+                "type": "string",
+                "example": "已调整空调温度"
+              },
+              "handler": {
+                "type": "string",
+                "example": "张三"
+              },
+              "handleTime": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-03-13 11:00:00"
+              }
+            }
+          }
+        }
+      },
+      "RtuDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "rtuId": {
+            "type": "string",
+            "example": "RTU-001"
+          },
+          "name": {
+            "type": "string",
+            "example": "1 号温湿度采集器"
+          },
+          "location": {
+            "type": "string",
+            "example": "机房 A 区"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["online", "offline"],
+            "example": "offline"
+          },
+          "serialPort": {
+            "type": "string",
+            "example": "COM3"
+          },
+          "baudRate": {
+            "type": "integer",
+            "example": 9600
+          },
+          "deviceAddress": {
+            "type": "integer",
+            "example": 1
+          },
+          "samplingInterval": {
+            "type": "integer",
+            "example": 1
+          },
+          "secret": {
+            "type": "string",
+            "description": "认证密钥",
+            "example": "abc123xyz"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-03-13 10:00:00"
+          },
+          "updateTime": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-03-13 10:00:00"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "错误码"
+          },
+          "message": {
+            "type": "string",
+            "description": "错误消息"
+          },
+          "data": {
+            "type": "object",
+            "description": "错误详情数据",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

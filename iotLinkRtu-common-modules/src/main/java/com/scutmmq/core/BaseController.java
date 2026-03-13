@@ -26,17 +26,17 @@ public abstract class BaseController {
                 case "DELETE" -> delete(request, response);
                 default       -> response.json(
                         HttpResponseStatus.METHOD_NOT_ALLOWED,
-                        ErrorBody.of(40500, "Method Not Allowed: " + request.method())
+                        buildErrorResponse(40500, "Method Not Allowed: " + request.method())
                 );
             }
         } catch (ApiException e) {
             // 业务异常：转为对应 HTTP 错误响应
-            response.json(e.getStatus(), ErrorBody.of(e.getErrorCode(), e.getMessage()));
+            response.json(e.getStatus(), buildErrorResponse(e.getErrorCode(), e.getErrorMsg()));
         } catch (Exception e) {
             // 未预期异常：统一返回 500
             response.json(
                     HttpResponseStatus.INTERNAL_SERVER_ERROR,
-                    ErrorBody.of(50000, "Internal Server Error: " + e.getMessage())
+                    buildErrorResponse(50000, "Internal Server Error: " + e.getMessage())
             );
         }
     }
@@ -100,11 +100,51 @@ public abstract class BaseController {
         try { return ((Number) val).intValue(); } catch (Exception e) { return defaultVal; }
     }
 
-    /** 错误响应体格式（Java 16+ Record）*/
+    /** 错误响应体格式 */
     record ErrorBody(int code, String message) {
         static ErrorBody of(int code, String msg) {
             return new ErrorBody(code, msg);
         }
+    }
+    
+    /**
+     * 构建统一的错误响应体
+     * 
+     * @param code 错误码
+     * @param message 错误消息
+     * @return 错误响应 Map
+     */
+    protected java.util.Map<String, Object> buildErrorResponse(int code, String message) {
+        return java.util.Map.of(
+            "code", code,
+            "message", message
+        );
+    }
+    
+    /**
+     * 构建成功的响应体（不含 data）
+     * 
+     * @return 成功响应 Map
+     */
+    protected java.util.Map<String, Object> buildSuccessResponse() {
+        return java.util.Map.of(
+            "code", 200,
+            "message", "success"
+        );
+    }
+    
+    /**
+     * 构建成功的响应体（含 data）
+     * 
+     * @param data 数据
+     * @return 成功响应 Map
+     */
+    protected java.util.Map<String, Object> buildSuccessResponse(Object data) {
+        return java.util.Map.of(
+            "code", 200,
+            "message", "success",
+            "data", data
+        );
     }
 }
 

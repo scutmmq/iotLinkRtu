@@ -14,6 +14,7 @@
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="17">
+      <module name="common-modules" target="17" />
       <module name="web-server" target="17" />
     </bytecodeTargetLevel>
   </component>
