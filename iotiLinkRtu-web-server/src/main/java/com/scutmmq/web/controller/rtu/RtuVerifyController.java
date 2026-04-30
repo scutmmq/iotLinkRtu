@@ -1,11 +1,12 @@
 package com.scutmmq.web.controller.rtu;
 
 import com.scutmmq.BadRequestException;
-import com.scutmmq.NotFoundException;
 import com.scutmmq.core.BaseController;
 import com.scutmmq.core.MyHttpRequest;
 import com.scutmmq.core.MyHttpResponse;
 import com.scutmmq.exception.ErrorCode;
+import com.scutmmq.web.service.RtuAuthService;
+import io.netty.handler.codec.http.HttpResponseStatus;
 
 import java.util.Map;
 
@@ -17,46 +18,49 @@ import java.util.Map;
  */
 public class RtuVerifyController extends BaseController {
     
+    private final RtuAuthService authService = new RtuAuthService();
+    
     @Override
     protected void post(MyHttpRequest req, MyHttpResponse resp) throws Exception {
         // 1. 获取请求参数
         String rtuId = req.bodyString("rtuId");
         String secretHash = req.bodyString("secretHash");
+        Long timestamp = toLong(req.bodyJson().get("timestamp"));
         
         // 2. 必填参数校验
         requireNotBlank(rtuId, "rtuId");
         requireNotBlank(secretHash, "secretHash");
+        requireNotNull(timestamp, "timestamp");
         
-        // 3. 业务校验 - 验证 RTU 和密钥（模拟）
-        // TODO: 实际项目中应调用 Service 层查询数据库
-        System.out.println("验证 RTU: " + rtuId);
+        // 3. 调用 Service 层验证
+        RtuAuthService.VerifyResult result = authService.verify(rtuId, secretHash, timestamp);
         
-        // 4. 模拟验证逻辑
-        // 假设 RTU001 存在且密钥正确
-        if (!"RTU001".equals(rtuId)) {
-            // RTU 不存在
-            throw new NotFoundException(ErrorCode.RTU_NOT_FOUND, "RTU 不存在：" + rtuId);
-        }
-        
-        // 模拟验证 secretHash (实际应该查询数据库对比)
-        boolean isValid = "valid_hash".equals(secretHash);
-        
-        if (!isValid) {
+        // 4. 返回响应
+        if (result.isValid()) {
+            // 认证成功
+            Map<String, Object> data = Map.of(
+                "valid", true,
+                "status", result.getStatus(),
+                "rtuId", result.getRtuId()
+            );
+            resp.json(buildSuccessResponse(data));
+        } else {
             // 认证失败
-            resp.json(Map.of(
+            Map<String, Object> errorResp = Map.of(
                 "code", 401,
-                "message", "认证失败：RTU 不存在或密钥错误",
+                "message", result.getMessage(),
                 "data", Map.of("valid", false)
-            ));
-            return;
+            );
+            resp.json(HttpResponseStatus.UNAUTHORIZED, errorResp);
         }
-        
-        // 5. 认证成功
-        Map<String, Object> data = Map.of(
-            "valid", true,
-            "status", "ENABLED",
-            "rtuId", rtuId
-        );
-        resp.json(buildSuccessResponse(data));
+    }
+    
+    /**
+     * 将对象转换为 Long 类型
+     */
+    private Long toLong(Object val) {
+        if (val == null) return null;
+        if (val instanceof Number n) return n.longValue();
+        try { return Long.parseLong(val.toString()); } catch (Exception e) { return null; }
     }
 }

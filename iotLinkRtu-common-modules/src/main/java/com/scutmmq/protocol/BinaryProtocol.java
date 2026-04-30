@@ -50,15 +50,16 @@ public class BinaryProtocol {
         System.arraycopy(rtuIdSrc, 0, rtuIdBytes, 0, Math.min(rtuIdSrc.length, 16));
         buffer.put(rtuIdBytes);
 
-        // 4.2 获取当前时间戳（4字节，用于防重放）
+        // 4.2 获取当前秒级时间戳（4字节，用于防重放）
         int timestamp = (int) (System.currentTimeMillis() / 1000);
         byte[] timestampBytes = ByteBuffer.allocate(4).putInt(timestamp).array();
+        buffer.put(timestampBytes);
 
         // 4.3 计算 SHA-256 哈希：SHA256(secret + rtuId + timestamp前4字节)
         byte[] secretHash = calculateSecretHash(secret, rtuId, timestampBytes);
         buffer.put(secretHash); // 32字节
 
-        // 5. 回填数据长度（16 + 32 = 48字节）
+        // 5. 回填数据长度（16 + 4 + 32 = 52字节）
         int dataLength = buffer.position() - dataStartPos;
         buffer.putShort(lengthPos, (short) dataLength);
 

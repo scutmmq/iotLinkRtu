@@ -1,12 +1,12 @@
 package com.scutmmq.web.controller.config;
 
 import com.scutmmq.BadRequestException;
-import com.scutmmq.NotFoundException;
-import com.scutmmq.ServerException;
 import com.scutmmq.core.BaseController;
 import com.scutmmq.core.MyHttpRequest;
 import com.scutmmq.core.MyHttpResponse;
 import com.scutmmq.exception.ErrorCode;
+import com.scutmmq.web.model.RtuConfig;
+import com.scutmmq.web.service.RtuConfigService;
 
 import java.util.Map;
 
@@ -17,6 +17,17 @@ import java.util.Map;
  * @date 2026-03-13
  */
 public class ConfigUpdateController extends BaseController {
+
+    private final RtuConfigService configService = new RtuConfigService();
+
+    @Override
+    protected void get(MyHttpRequest req, MyHttpResponse resp) throws Exception {
+        String rtuId = req.pathParam("rtuId");
+        requireNotBlank(rtuId, "rtuId");
+
+        RtuConfig config = configService.getByRtuId(rtuId);
+        resp.json(buildSuccessResponse(toResponse(config)));
+    }
     
     @Override
     protected void put(MyHttpRequest req, MyHttpResponse resp) throws Exception {
@@ -27,13 +38,8 @@ public class ConfigUpdateController extends BaseController {
         Map<String, Object> body = req.bodyJson();
         Integer samplingInterval = toInteger(body.get("samplingInterval"));
         
-        // 2. 业务校验 - 检查 RTU 是否存在
-        if (!"RTU001".equals(rtuId)) {
-            throw new NotFoundException(ErrorCode.RTU_NOT_FOUND);
-        }
-        
-        // 3. 校验采样间隔
-        if (samplingInterval == null || samplingInterval < 1 || samplingInterval > 60) {
+        // 2. 校验采样间隔
+        if (samplingInterval != null && (samplingInterval < 1 || samplingInterval > 60)) {
             throw new BadRequestException(ErrorCode.SAMPLING_INTERVAL_INVALID, 
                 "采样间隔必须在 1-60 秒之间，当前值：" + samplingInterval);
         }
@@ -58,17 +64,39 @@ public class ConfigUpdateController extends BaseController {
             }
         }
         
-        // 6. 更新配置并下发（模拟）
-        System.out.println("更新 RTU 配置：" + rtuId + ", samplingInterval=" + samplingInterval);
-        
-        // TODO: 实际项目中应调用 Service 层更新并下发到 MQTT
-        // boolean success = configService.updateAndApply(rtuId, body);
-        // if (!success) {
-        //     throw new ServerException(ErrorCode.CONFIG_APPLY_FAILED);
-        // }
-        
-        // 7. 返回响应
-        resp.json(buildSuccessResponse());
+        RtuConfig patch = new RtuConfig();
+        patch.setRtuId(rtuId);
+        patch.setInterval(samplingInterval);
+        patch.setAlarmEnabled(toBoolean(body.get("alarmEnabled")));
+
+        if (tempThresh != null) {
+            patch.setTempThresholdMin(toDouble(tempThresh.get("min")));
+            patch.setTempThresholdMax(toDouble(tempThresh.get("max")));
+        }
+        if (humiThresh != null) {
+            patch.setHumidityThresholdMin(toDouble(humiThresh.get("min")));
+            patch.setHumidityThresholdMax(toDouble(humiThresh.get("max")));
+        }
+        if (body.containsKey("baudRate")) {
+            patch.setBaudRate(toInteger(body.get("baudRate")));
+        }
+        if (body.containsKey("deviceAddress")) {
+            patch.setModbusDeviceAddress(toInteger(body.get("deviceAddress")));
+        }
+        if (body.containsKey("tempCalibration")) {
+            patch.setTempCalibration(toDouble(body.get("tempCalibration")));
+        }
+        if (body.containsKey("humidityCalibration")) {
+            patch.setHumidityCalibration(toDouble(body.get("humidityCalibration")));
+        }
+
+        RtuConfig saved = configService.update(rtuId, patch);
+        resp.json(buildSuccessResponse(toResponse(saved)));
+    }
+
+    @Override
+    protected void post(MyHttpRequest req, MyHttpResponse resp) throws Exception {
+        put(req, resp);
     }
     
     /**
@@ -78,5 +106,38 @@ public class ConfigUpdateController extends BaseController {
         if (val == null) return null;
         if (val instanceof Number n) return n.floatValue();
         try { return Float.parseFloat(val.toString()); } catch (Exception e) { return null; }
+    }
+
+    private Double toDouble(Object val) {
+        if (val == null) return null;
+        if (val instanceof Number n) return n.doubleValue();
+        try { return Double.parseDouble(val.toString()); } catch (Exception e) { return null; }
+    }
+
+    private Boolean toBoolean(Object val) {
+        if (val == null) return null;
+        if (val instanceof Boolean bool) return bool;
+        return Boolean.parseBoolean(val.toString());
+    }
+
+    private Map<String, Object> toResponse(RtuConfig config) {
+        return Map.ofEntries(
+            Map.entry("rtuId", config.getRtuId()),
+            Map.entry("samplingInterval", config.getInterval()),
+            Map.entry("deviceAddress", config.getModbusDeviceAddress()),
+            Map.entry("baudRate", config.getBaudRate()),
+            Map.entry("tempCalibration", config.getTempCalibration() != null ? config.getTempCalibration() : 0.0),
+            Map.entry("humidityCalibration", config.getHumidityCalibration() != null ? config.getHumidityCalibration() : 0.0),
+            Map.entry("temperatureThreshold", Map.of(
+                "min", config.getTempThresholdMin(),
+                "max", config.getTempThresholdMax()
+            )),
+            Map.entry("humidityThreshold", Map.of(
+                "min", config.getHumidityThresholdMin(),
+                "max", config.getHumidityThresholdMax()
+            )),
+            Map.entry("alarmEnabled", config.getAlarmEnabled() != null ? config.getAlarmEnabled() : Boolean.TRUE),
+            Map.entry("updateTime", config.getUpdateTime() != null ? config.getUpdateTime().toString() : "")
+        );
     }
 }

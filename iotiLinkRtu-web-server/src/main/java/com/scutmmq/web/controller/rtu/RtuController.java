@@ -6,6 +6,10 @@ import com.scutmmq.core.BaseController;
 import com.scutmmq.core.MyHttpRequest;
 import com.scutmmq.core.MyHttpResponse;
 import com.scutmmq.exception.ErrorCode;
+import com.scutmmq.web.model.RtuConfig;
+import com.scutmmq.web.model.RtuGateway;
+import com.scutmmq.web.service.RtuConfigService;
+import com.scutmmq.web.service.RtuGatewayService;
 
 import java.util.Map;
 
@@ -16,6 +20,9 @@ import java.util.Map;
  * @date 2026-03-13
  */
 public class RtuController extends BaseController {
+
+    private final RtuGatewayService rtuService = new RtuGatewayService();
+    private final RtuConfigService configService = new RtuConfigService();
     
     /**
      * GET - 查询 RTU 详情
@@ -26,26 +33,26 @@ public class RtuController extends BaseController {
         String rtuId = req.pathParam("rtuId");
         requireNotBlank(rtuId, "rtuId");
         
-        // 2. 查询 RTU（模拟）
-        System.out.println("查询 RTU 详情：" + rtuId);
-        
-        // 3. 模拟数据 - 假设 RTU001 存在
-        if (!"RTU001".equals(rtuId)) {
+        RtuGateway gateway = rtuService.findByRtuId(rtuId);
+        if (gateway == null) {
             throw new NotFoundException(ErrorCode.RTU_NOT_FOUND, "RTU 不存在：" + rtuId);
         }
-        
+        RtuConfig config = configService.getByRtuId(rtuId);
+
         Map<String, Object> data = Map.ofEntries(
-            Map.entry("id", 1),
-            Map.entry("rtuId", rtuId),
-            Map.entry("name", "1 号温湿度采集器"),
-            Map.entry("location", "机房 A 区"),
-            Map.entry("status", "online"),
-            Map.entry("serialPort", "COM3"),
-            Map.entry("baudRate", 9600),
-            Map.entry("deviceAddress", 1),
-            Map.entry("samplingInterval", 1),
-            Map.entry("lastOnlineTime", "2026-03-13 10:30:00"),
-            Map.entry("createTime", "2026-03-13 10:00:00")
+            Map.entry("id", gateway.getId()),
+            Map.entry("rtuId", gateway.getRtuId()),
+            Map.entry("name", gateway.getName()),
+            Map.entry("location", gateway.getLocation() != null ? gateway.getLocation() : ""),
+            Map.entry("status", gateway.getOnline()),
+            Map.entry("gatewayStatus", gateway.getStatus()),
+            Map.entry("serialPort", gateway.getSerialPort() != null ? gateway.getSerialPort() : ""),
+            Map.entry("baudRate", config.getBaudRate()),
+            Map.entry("deviceAddress", config.getModbusDeviceAddress()),
+            Map.entry("samplingInterval", config.getInterval()),
+            Map.entry("lastOnlineTime", gateway.getHeartbeatTime() != null ? gateway.getHeartbeatTime().toString() : ""),
+            Map.entry("createTime", gateway.getCreateTime() != null ? gateway.getCreateTime().toString() : ""),
+            Map.entry("updateTime", gateway.getUpdateTime() != null ? gateway.getUpdateTime().toString() : "")
         );
         resp.json(buildSuccessResponse(data));
     }
@@ -63,23 +70,34 @@ public class RtuController extends BaseController {
         String name = req.bodyString("name");
         String location = req.bodyString("location");
         Integer samplingInterval = toInteger(body.get("samplingInterval"));
-        
-        // 2. 业务校验 - 检查 RTU 是否存在
-        if (!"RTU001".equals(rtuId)) {
-            throw new NotFoundException(ErrorCode.RTU_NOT_FOUND);
+        String gatewayStatus = req.bodyString("gatewayStatus");
+
+        RtuGateway existing = rtuService.findByRtuId(rtuId);
+        if (existing == null) {
+            throw new NotFoundException(ErrorCode.RTU_NOT_FOUND, "RTU 不存在：" + rtuId);
         }
-        
-        // 3. 更新 RTU（模拟）
-        System.out.println("更新 RTU: " + rtuId + ", name=" + name + ", location=" + location);
-        
-        // 4. 返回响应
-        Map<String, Object> data = Map.of(
-            "id", 1,
-            "rtuId", rtuId,
-            "name", name != null ? name : "原名称",
-            "location", location != null ? location : "原位置",
-            "samplingInterval", samplingInterval != null ? samplingInterval : 1,
-            "updateTime", java.time.LocalDateTime.now().toString()
+
+        RtuGateway update = new RtuGateway();
+        update.setRtuId(rtuId);
+        update.setName(name);
+        update.setLocation(location);
+        update.setStatus(gatewayStatus);
+        update.setSerialPort(existing.getSerialPort());
+        rtuService.update(update);
+
+        if (samplingInterval != null) {
+            configService.updateInterval(rtuId, samplingInterval);
+        }
+
+        RtuGateway gateway = rtuService.findByRtuId(rtuId);
+        RtuConfig config = configService.getByRtuId(rtuId);
+        Map<String, Object> data = Map.ofEntries(
+            Map.entry("id", gateway.getId()),
+            Map.entry("rtuId", rtuId),
+            Map.entry("name", gateway.getName()),
+            Map.entry("location", gateway.getLocation() != null ? gateway.getLocation() : ""),
+            Map.entry("samplingInterval", config.getInterval()),
+            Map.entry("updateTime", gateway.getUpdateTime() != null ? gateway.getUpdateTime().toString() : "")
         );
         resp.json(buildSuccessResponse(data));
     }
@@ -93,23 +111,21 @@ public class RtuController extends BaseController {
         String rtuId = req.pathParam("rtuId");
         requireNotBlank(rtuId, "rtuId");
         
-        // 2. 业务校验 - 检查 RTU 是否存在
-        System.out.println("删除 RTU: " + rtuId);
-        
-        if (!"RTU001".equals(rtuId)) {
+        RtuGateway gateway = rtuService.findByRtuId(rtuId);
+        if (gateway == null) {
             throw new NotFoundException(ErrorCode.RTU_NOT_FOUND, "RTU 不存在：" + rtuId);
         }
-        
-        // 3. 检查 RTU 状态（模拟）
-        boolean isOnline = false; // 模拟离线状态
-        if (isOnline) {
-            throw new BadRequestException(ErrorCode.RTU_OFFLINE, "RTU 在线，不允许删除");
+
+        if ("ONLINE".equalsIgnoreCase(gateway.getOnline())) {
+            throw new BadRequestException(ErrorCode.RTU_ONLINE, "RTU 在线，不允许删除");
         }
-        
-        // 4. 执行删除操作（模拟）
-        System.out.println("RTU 删除成功：" + rtuId);
-        
-        // 5. 返回响应
+
+        try {
+            rtuService.delete(rtuId);
+        } catch (IllegalStateException e) {
+            throw new BadRequestException(ErrorCode.RTU_ONLINE, e.getMessage());
+        }
+
         Map<String, Object> data = Map.of(
             "deleted", true,
             "rtuId", rtuId

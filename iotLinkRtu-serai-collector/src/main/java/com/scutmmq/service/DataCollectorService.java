@@ -111,9 +111,6 @@ public class DataCollectorService {
             // 3. 等待并读取响应（超时500ms）
             byte[] modbusResponse = serialPortManager.read(500);
 
-            // TODO 先临时给一个读取到的数据，后续再改成真正从串口读取的
-            modbusResponse = new byte[]{0x01, 0x03, 0x04, 0x02, (byte) 0x92, (byte) 0xFF, (byte) 0x9B, 0x5A, 0x3D};
-
             if (modbusResponse == null || modbusResponse.length == 0) {
                 logger.warn("未收到 设备{} Modbus 响应（超时）", deviceAddress);
                 return;

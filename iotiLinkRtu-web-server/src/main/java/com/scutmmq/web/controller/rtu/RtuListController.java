@@ -3,7 +3,11 @@ package com.scutmmq.web.controller.rtu;
 import com.scutmmq.core.BaseController;
 import com.scutmmq.core.MyHttpRequest;
 import com.scutmmq.core.MyHttpResponse;
+import com.scutmmq.web.model.RtuConfig;
+import com.scutmmq.web.model.RtuGateway;
+import com.scutmmq.web.service.RtuGatewayService;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -14,6 +18,8 @@ import java.util.Map;
  * @date 2026-03-13
  */
 public class RtuListController extends BaseController {
+
+    private final RtuGatewayService rtuService = new RtuGatewayService();
     
     @Override
     protected void get(MyHttpRequest req, MyHttpResponse resp) throws Exception {
@@ -21,38 +27,46 @@ public class RtuListController extends BaseController {
         String pageStr = req.queryParam("page");
         String sizeStr = req.queryParam("size");
         String status = req.queryParam("status");
+        String online = req.queryParam("online");
+        String rtuIdKeyword = req.queryParam("rtuId");
         
         int page = parseIntParam(pageStr, 1);
         int size = parseIntParam(sizeStr, 10);
-        
-        // 2. 查询数据（模拟）
-        // TODO: 实际项目中应调用 Service 层查询
-        System.out.println("查询 RTU 列表：page=" + page + ", size=" + size + ", status=" + status);
-        
-        // 3. 模拟数据
-        Map<String, Object> rtu1 = Map.of(
-            "id", 1,
-            "rtuId", "RTU001",
-            "name", "1 号温湿度采集器",
-            "status", "online",
-            "lastOnlineTime", "2026-03-13 10:30:00",
-            "location", "机房 A 区"
-        );
-        
-        Map<String, Object> rtu2 = Map.of(
-            "id", 2,
-            "rtuId", "RTU002",
-            "name", "2 号温湿度采集器",
-            "status", "offline",
-            "lastOnlineTime", "2026-03-13 09:00:00",
-            "location", "机房 B 区"
-        );
-        
-        List<Map<String, Object>> list = List.of(rtu1, rtu2);
-        
-        // 4. 返回响应
+
+        String gatewayStatus = null;
+        String onlineStatus = online;
+        if (status != null) {
+            String normalized = status.trim().toUpperCase();
+            if ("ONLINE".equals(normalized) || "OFFLINE".equals(normalized)) {
+                onlineStatus = normalized;
+            } else if ("ENABLED".equals(normalized) || "DISABLED".equals(normalized)) {
+                gatewayStatus = normalized;
+            }
+        }
+
+        List<RtuGateway> gateways = rtuService.findPage(page, size, gatewayStatus, onlineStatus, rtuIdKeyword);
+        long total = rtuService.count(gatewayStatus, onlineStatus, rtuIdKeyword);
+        List<Map<String, Object>> list = new ArrayList<>();
+
+        for (RtuGateway gateway : gateways) {
+            RtuConfig config = rtuService.getConfig(gateway.getRtuId());
+            list.add(Map.ofEntries(
+                Map.entry("id", gateway.getId()),
+                Map.entry("rtuId", gateway.getRtuId()),
+                Map.entry("name", gateway.getName()),
+                Map.entry("status", gateway.getOnline()),
+                Map.entry("gatewayStatus", gateway.getStatus()),
+                Map.entry("lastOnlineTime", gateway.getHeartbeatTime() != null ? gateway.getHeartbeatTime().toString() : ""),
+                Map.entry("location", gateway.getLocation() != null ? gateway.getLocation() : ""),
+                Map.entry("serialPort", gateway.getSerialPort() != null ? gateway.getSerialPort() : ""),
+                Map.entry("baudRate", config.getBaudRate()),
+                Map.entry("deviceAddress", config.getModbusDeviceAddress()),
+                Map.entry("samplingInterval", config.getInterval())
+            ));
+        }
+
         Map<String, Object> data = Map.of(
-            "total", list.size(),
+            "total", total,
             "list", list
         );
         resp.json(buildSuccessResponse(data));

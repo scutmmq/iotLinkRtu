@@ -1,0 +1,6 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Fri May 01 00:08:30 CST 2026
+@default-aliyun-https\://maven.aliyun.com/repository/public/.lastUpdated=1777565238440
+@default-aliyunmaven-https\://maven.aliyun.com/repository/public/.lastUpdated=1777565238597
+https\://maven.aliyun.com/repository/public/.error=Could not transfer artifact org.apache.maven.plugins\:maven-resources-plugin\:pom\:3.3.1 from/to aliyunmaven (https\://maven.aliyun.com/repository/public)\: Permission denied\: no further information
+https\://repo1.maven.org/maven2/.lastUpdated=1777565310107

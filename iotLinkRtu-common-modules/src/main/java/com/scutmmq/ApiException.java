@@ -58,14 +58,16 @@ public class ApiException extends RuntimeException {
     private static HttpResponseStatus mapToHttpStatus(int code) {
         if (code >= 200 && code < 300) {
             return HttpResponseStatus.OK;
-        } else if (code >= 400 && code < 500) {
-            return HttpResponseStatus.BAD_REQUEST;
         } else if (code == 401) {
             return HttpResponseStatus.UNAUTHORIZED;
         } else if (code == 403) {
             return HttpResponseStatus.FORBIDDEN;
         } else if (code == 404) {
             return HttpResponseStatus.NOT_FOUND;
+        } else if (code == 405) {
+            return HttpResponseStatus.METHOD_NOT_ALLOWED;
+        } else if (code >= 400 && code < 500) {
+            return HttpResponseStatus.BAD_REQUEST;
         } else if (code >= 500) {
             return HttpResponseStatus.INTERNAL_SERVER_ERROR;
         }

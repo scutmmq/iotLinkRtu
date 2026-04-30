@@ -6,6 +6,7 @@ import com.scutmmq.web.controller.config.HttpServerConfig;
 import com.scutmmq.web.controller.rtu.RtuRegisterController;
 import com.scutmmq.web.controller.rtu.RtuListController;
 import com.scutmmq.web.controller.rtu.RtuController;
+import com.scutmmq.web.controller.rtu.RtuGatewayStatusController;
 import com.scutmmq.web.controller.rtu.RtuVerifyController;
 import com.scutmmq.web.controller.data.DataRealtimeController;
 import com.scutmmq.web.controller.data.DataHistoryController;
@@ -31,6 +32,7 @@ public class Application {
         router.register("/api/rtu/list", RtuListController.class);
         router.registerPattern("/api/rtu/{rtuId}", RtuController.class);  // GET/PUT/DELETE
         router.register("/api/rtu/gateway/verify", RtuVerifyController.class);
+        router.register("/api/rtu/gateway/status", RtuGatewayStatusController.class);
         
         // ===== 数据查询接口 =====
         router.register("/api/data/realtime", DataRealtimeController.class);

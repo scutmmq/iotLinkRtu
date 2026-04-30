@@ -1,11 +1,13 @@
 package com.scutmmq.handler;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.scutmmq.config.Config;
 import com.scutmmq.manager.RtuConnectionManager;
 import com.scutmmq.mqtt.MqttPublisher;
 import com.scutmmq.parser.ModBusDataParser;
 import com.scutmmq.protocol.BinaryFrame;
 import com.scutmmq.protocol.BinaryProtocol;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -14,6 +16,13 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 二进制帧处理器
@@ -29,10 +38,14 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
 
     private final RtuConnectionManager connectionManager;
     private final MqttPublisher mqttPublisher;
+    private final HttpClient httpClient;
+    private final Map<String, CachedThresholdConfig> thresholdCache;
 
     public BinaryFrameHandler(RtuConnectionManager connectionManager, MqttPublisher mqttPublisher) {
         this.connectionManager = connectionManager;
         this.mqttPublisher = mqttPublisher;
+        this.httpClient = HttpClient.newHttpClient();
+        this.thresholdCache = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -66,9 +79,9 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
     private void handleAuthRequest(ChannelHandlerContext ctx, BinaryFrame frame) {
         byte[] data = frame.getData();
 
-        // 数据格式：rtuId(16字节) + secretHash(32字节)
-        if (data.length != 48) {
-            log.error("认证请求数据长度错误: {}, 期望48字节", data.length);
+        // 数据格式：rtuId(16字节) + timestamp(4字节) + secretHash(32字节)
+        if (data.length != 52) {
+            log.error("认证请求数据长度错误: {}, 期望52字节", data.length);
             sendAuthResponse(ctx, false);
             return;
         }
@@ -78,27 +91,24 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
         System.arraycopy(data, 0, rtuIdBytes, 0, 16);
         String rtuId = new String(rtuIdBytes, StandardCharsets.UTF_8).trim().replace("\0", "");
 
+        byte[] timestampBytes = new byte[4];
+        System.arraycopy(data, 16, timestampBytes, 0, 4);
+        long timestamp = ByteBuffer.wrap(timestampBytes).getInt() & 0xFFFFFFFFL;
+
         // 提取 secretHash（32字节）
         byte[] receivedHash = new byte[32];
-        System.arraycopy(data, 16, receivedHash, 0, 32);
+        System.arraycopy(data, 20, receivedHash, 0, 32);
 
-        log.info("收到认证请求: rtuId={}", rtuId);
+        log.info("收到认证请求: rtuId={}, timestamp={}", rtuId, timestamp);
 
-        // TODO: 调用 web-server API 验证 rtuId 和 secretHash
-        // GET /api/rtu/gateway/{rtuId}/verify?secretHash=xxx
-        // 返回：{"valid": true, "status": "ENABLED"}
-        // 这里暂时简单验证（实际应该调用 HTTP API）
-        AuthResult authResult = verifyAuth(rtuId, receivedHash);
-
-        // TODO 临时通过验证
-        authResult.setStatus("ENABLED");
-        authResult.setValid(true);
+        AuthResult authResult = verifyAuth(rtuId, receivedHash, timestamp);
 
         if (authResult.isValid() && "ENABLED".equals(authResult.getStatus())) {
             // 注册连接
             connectionManager.register(rtuId, ctx.channel());
             log.info("RTU {} 认证成功并已启用", rtuId);
             sendAuthResponse(ctx, true);
+            syncOnlineStatus(rtuId, "ONLINE");
 
             // 发布上线通知到 MQTT
             mqttPublisher.publishOnlineNotification(rtuId);
@@ -143,6 +153,7 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
 
         String rtuId = connectionManager.getRtuId(ctx.channel());
         log.debug("收到 RTU {} 的心跳", rtuId);
+        syncOnlineStatus(rtuId, "ONLINE");
 
         // 发送心跳响应
         byte[] response = BinaryProtocol.buildHeartbeatResponse();
@@ -165,16 +176,63 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
     /**
      * 验证认证信息（临时实现，实际应调用 web-server API）
      */
-    private AuthResult verifyAuth(String rtuId, byte[] receivedHash) {
-        // TODO: 调用 web-server API
-        // GET /api/rtu/gateway/{rtuId}/verify?secretHash=xxx
-        // Response: {"valid": true, "status": "ENABLED"}
+    private AuthResult verifyAuth(String rtuId, byte[] receivedHash, long timestamp) {
+        String url = Config.webServerApiUrl + "/api/rtu/gateway/verify";
+        String secretHashHex = bytesToHex(receivedHash).toLowerCase();
+        String requestBody = String.format(
+            "{\"rtuId\":\"%s\",\"secretHash\":\"%s\",\"timestamp\":%d}",
+            escapeJson(rtuId), secretHashHex, timestamp
+        );
 
-        // 临时实现：简单验证 rtuId 格式
-        boolean valid = rtuId != null && rtuId.startsWith("RTU");
-        String status = valid ? "ENABLED" : "DISABLED";
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
 
-        return new AuthResult(valid, status);
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                log.warn("RTU 认证失败，web-server 返回状态码: {}, body={}", response.statusCode(), response.body());
+                return new AuthResult(false, "DISABLED");
+            }
+
+            JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+            JsonObject data = root.getAsJsonObject("data");
+            boolean valid = data != null && data.has("valid") && data.get("valid").getAsBoolean();
+            String status = data != null && data.has("status") ? data.get("status").getAsString() : "DISABLED";
+            return new AuthResult(valid, status);
+        } catch (Exception e) {
+            log.error("调用 web-server 验证 RTU 失败: rtuId={}", rtuId, e);
+            return new AuthResult(false, "DISABLED");
+        }
+    }
+
+    private void syncOnlineStatus(String rtuId, String online) {
+        if (rtuId == null || rtuId.isBlank()) {
+            return;
+        }
+
+        String url = Config.webServerApiUrl + "/api/rtu/gateway/status";
+        String requestBody = String.format(
+            "{\"rtuId\":\"%s\",\"online\":\"%s\"}",
+            escapeJson(rtuId), escapeJson(online)
+        );
+
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+            httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+        } catch (Exception e) {
+            log.warn("同步 RTU 在线状态失败: rtuId={}, online={}", rtuId, online, e);
+        }
+    }
+
+    private String escapeJson(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     /**
@@ -261,11 +319,15 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
      * 检查阈值并发送报警
      */
     private void checkThresholdAndAlarm(String rtuId, float temperature, float humidity) {
-        // TODO: 从配置中读取阈值，这里使用硬编码示例
-        float tempMin = 18.0f;
-        float tempMax = 28.0f;
-        float humidityMin = 40.0f;
-        float humidityMax = 60.0f;
+        ThresholdConfig thresholdConfig = loadThresholdConfig(rtuId);
+        if (!thresholdConfig.alarmEnabled()) {
+            return;
+        }
+
+        float tempMin = thresholdConfig.tempMin();
+        float tempMax = thresholdConfig.tempMax();
+        float humidityMin = thresholdConfig.humidityMin();
+        float humidityMax = thresholdConfig.humidityMax();
 
         if (temperature > tempMax) {
             mqttPublisher.publishAlarm(rtuId, "temperature_high", "warning",
@@ -282,6 +344,57 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
             mqttPublisher.publishAlarm(rtuId, "humidity_low", "warning",
                 humidity, humidityMin, "湿度低于下限阈值", "请检查加湿设备");
         }
+    }
+
+    private ThresholdConfig loadThresholdConfig(String rtuId) {
+        CachedThresholdConfig cached = thresholdCache.get(rtuId);
+        long now = System.currentTimeMillis();
+        if (cached != null && now - cached.cachedAt() < 30_000) {
+            return cached.config();
+        }
+
+        ThresholdConfig fallback = ThresholdConfig.defaultConfig();
+        try {
+            String encodedRtuId = URLEncoder.encode(rtuId, StandardCharsets.UTF_8);
+            String url = Config.webServerApiUrl + "/api/rtu/" + encodedRtuId + "/config";
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .GET()
+                .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                return fallback;
+            }
+
+            JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+            JsonObject data = root.getAsJsonObject("data");
+            if (data == null) {
+                return fallback;
+            }
+
+            JsonObject temperatureThreshold = data.getAsJsonObject("temperatureThreshold");
+            JsonObject humidityThreshold = data.getAsJsonObject("humidityThreshold");
+            ThresholdConfig config = new ThresholdConfig(
+                getFloat(temperatureThreshold, "min", 18.0f),
+                getFloat(temperatureThreshold, "max", 28.0f),
+                getFloat(humidityThreshold, "min", 40.0f),
+                getFloat(humidityThreshold, "max", 60.0f),
+                data.has("alarmEnabled") && !data.get("alarmEnabled").isJsonNull() ? data.get("alarmEnabled").getAsBoolean() : true
+            );
+
+            thresholdCache.put(rtuId, new CachedThresholdConfig(config, now));
+            return config;
+        } catch (Exception e) {
+            log.warn("加载 RTU 阈值配置失败，使用默认值: rtuId={}", rtuId, e);
+            return fallback;
+        }
+    }
+
+    private float getFloat(JsonObject object, String key, float defaultValue) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) {
+            return defaultValue;
+        }
+        return object.get(key).getAsFloat();
     }
 
     /**
@@ -305,6 +418,7 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
 
         // 发布离线通知到 MQTT
         if (rtuId != null) {
+            syncOnlineStatus(rtuId, "OFFLINE");
             mqttPublisher.publishOfflineNotification(rtuId);
             mqttPublisher.publishStatusChange(rtuId, "online", "offline", "connection_lost", "TCP连接断开");
         }
@@ -316,5 +430,14 @@ public class BinaryFrameHandler extends SimpleChannelInboundHandler<BinaryFrame>
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         log.error("处理异常", cause);
         ctx.close();
+    }
+
+    private record ThresholdConfig(float tempMin, float tempMax, float humidityMin, float humidityMax, boolean alarmEnabled) {
+        private static ThresholdConfig defaultConfig() {
+            return new ThresholdConfig(18.0f, 28.0f, 40.0f, 60.0f, true);
+        }
+    }
+
+    private record CachedThresholdConfig(ThresholdConfig config, long cachedAt) {
     }
 }

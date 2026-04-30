@@ -42,7 +42,7 @@ public class Config {
      * Web Server API 地址
      * <p>用于验证 RTU 认证</p>
      */
-    public static final String webServerApiUrl = MicroConfig.readString("web.server.api.url", "http://localhost:8080");
+    public static final String webServerApiUrl = MicroConfig.readString("web.server.api.url", "http://localhost:8081");
 
     // Getter 方法（供 MQTT 客户端使用）
     public static String getMqttBrokerUrl() {
