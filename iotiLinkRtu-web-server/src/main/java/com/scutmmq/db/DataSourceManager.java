@@ -1,8 +1,8 @@
 package com.scutmmq.db;
 
+import com.scutmmq.web.config.WebServerProperties;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import com.scutmmq.utils.MicroConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,9 +51,9 @@ public class DataSourceManager {
         
         try {
             // 从配置文件读取数据库配置
-            String url = MicroConfig.readString("postgresql.url");
-            String username = MicroConfig.readString("postgresql.username");
-            String password = MicroConfig.readString("postgresql.password");
+            String url = WebServerProperties.readString("postgresql.url");
+            String username = WebServerProperties.readString("postgresql.username");
+            String password = WebServerProperties.readString("postgresql.password");
             
             // 验证配置
             if (url == null || username == null || password == null) {

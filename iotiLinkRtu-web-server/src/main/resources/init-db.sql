@@ -132,6 +132,29 @@ COMMENT ON COLUMN rtu_alarm.handler IS '处理人';
 COMMENT ON COLUMN rtu_alarm.handle_time IS '处理时间';
 
 -- ========================================
+-- 表：rtu_data（RTU 温湿度采集数据表）
+-- ========================================
+CREATE TABLE IF NOT EXISTS rtu_data (
+    id BIGSERIAL PRIMARY KEY,                              -- 自增主键 ID
+    rtu_id VARCHAR(64) NOT NULL,                           -- RTU 唯一标识
+    temperature DECIMAL(10,2),                             -- 温度值（℃）
+    humidity DECIMAL(10,2),                                -- 湿度值（%RH）
+    collect_time TIMESTAMP DEFAULT NOW() NOT NULL,         -- 采集时间
+    status VARCHAR(32) DEFAULT 'normal' NOT NULL           -- 数据状态：normal/warn/error
+);
+
+CREATE INDEX IF NOT EXISTS idx_rtu_data_rtu_id ON rtu_data(rtu_id);
+CREATE INDEX IF NOT EXISTS idx_rtu_data_collect_time ON rtu_data(collect_time);
+CREATE INDEX IF NOT EXISTS idx_rtu_data_rtu_time ON rtu_data(rtu_id, collect_time DESC);
+
+COMMENT ON TABLE rtu_data IS 'RTU 温湿度采集数据表';
+COMMENT ON COLUMN rtu_data.rtu_id IS 'RTU 唯一标识';
+COMMENT ON COLUMN rtu_data.temperature IS '温度值（℃）';
+COMMENT ON COLUMN rtu_data.humidity IS '湿度值（%RH）';
+COMMENT ON COLUMN rtu_data.collect_time IS '采集时间';
+COMMENT ON COLUMN rtu_data.status IS '数据状态：normal/warn/error';
+
+-- ========================================
 -- 触发器：自动更新 update_time
 -- ========================================
 -- rtu_gateway 表
@@ -174,6 +197,26 @@ INSERT INTO rtu_alarm (rtu_id, alarm_type, alarm_level, current_value, threshold
 ('RTU-001', 'HUMIDITY_LOW', 'INFO', 35.0, 40.0, '湿度低于下限（35.0% < 40.0%）', 'HANDLED'),
 ('RTU-002', 'TEMP_LOW', 'ERROR', 12.0, 15.0, '温度低于下限（12.0℃ < 15.0℃）', 'UNHANDLED');
 
+INSERT INTO rtu_data (rtu_id, temperature, humidity, collect_time, status) VALUES
+('RTU-001', 25.5, 50.2, NOW() - INTERVAL '11 minutes', 'normal'),
+('RTU-001', 25.8, 50.6, NOW() - INTERVAL '10 minutes', 'normal'),
+('RTU-001', 26.1, 51.0, NOW() - INTERVAL '9 minutes', 'normal'),
+('RTU-001', 26.4, 51.4, NOW() - INTERVAL '8 minutes', 'normal'),
+('RTU-001', 26.7, 51.7, NOW() - INTERVAL '7 minutes', 'normal'),
+('RTU-001', 27.1, 52.0, NOW() - INTERVAL '6 minutes', 'normal'),
+('RTU-001', 27.4, 52.2, NOW() - INTERVAL '5 minutes', 'normal'),
+('RTU-001', 27.8, 52.4, NOW() - INTERVAL '4 minutes', 'normal'),
+('RTU-001', 28.3, 52.8, NOW() - INTERVAL '3 minutes', 'warn'),
+('RTU-001', 28.7, 53.0, NOW() - INTERVAL '2 minutes', 'warn'),
+('RTU-001', 28.2, 52.6, NOW() - INTERVAL '1 minute', 'warn'),
+('RTU-001', 27.9, 52.1, NOW(), 'normal'),
+('RTU-002', 21.2, 46.0, NOW() - INTERVAL '5 minutes', 'normal'),
+('RTU-002', 21.5, 46.4, NOW() - INTERVAL '4 minutes', 'normal'),
+('RTU-002', 21.8, 46.8, NOW() - INTERVAL '3 minutes', 'normal'),
+('RTU-002', 22.0, 47.1, NOW() - INTERVAL '2 minutes', 'normal'),
+('RTU-002', 22.3, 47.5, NOW() - INTERVAL '1 minute', 'normal'),
+('RTU-002', 22.6, 47.9, NOW(), 'normal');
+
 -- ========================================
 -- 查询验证
 -- ========================================
@@ -188,3 +231,6 @@ SELECT * FROM rtu_config;
 
 -- 查看 rtu_alarm 数据
 SELECT * FROM rtu_alarm;
+
+-- 查看 rtu_data 数据
+SELECT * FROM rtu_data;

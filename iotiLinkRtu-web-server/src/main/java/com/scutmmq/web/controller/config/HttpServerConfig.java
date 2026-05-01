@@ -1,7 +1,7 @@
 package com.scutmmq.web.controller.config;
 
-import com.scutmmq.utils.MicroConfig;
+import com.scutmmq.web.config.WebServerProperties;
 
 public class HttpServerConfig {
-    public static int port = MicroConfig.readInt("http.server.port");
+    public static int port = WebServerProperties.readInt("http.server.port");
 }

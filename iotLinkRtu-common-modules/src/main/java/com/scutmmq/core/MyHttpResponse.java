@@ -53,13 +53,24 @@ public class MyHttpResponse {
      * 写出纯文本响应
      */
     public void text(String text) {
-        writeResponse(HttpResponseStatus.OK, text);
+        writeResponse(HttpResponseStatus.OK, text, "text/plain; charset=UTF-8");
+    }
+
+    /**
+     * 写出 HTML 响应
+     */
+    public void html(String html) {
+        writeResponse(HttpResponseStatus.OK, html, "text/html; charset=UTF-8");
     }
 
     /**
      * 底层响应写出：构建 Netty HTTP 响应并发送
      */
     private void writeResponse(HttpResponseStatus status, String body) {
+        writeResponse(status, body, "application/json; charset=UTF-8");
+    }
+
+    private void writeResponse(HttpResponseStatus status, String body, String contentType) {
         byte[] contentBytes = body.getBytes(CharsetUtil.UTF_8);
 
         FullHttpResponse response = new DefaultFullHttpResponse(
@@ -69,7 +80,7 @@ public class MyHttpResponse {
         );
 
         response.headers()
-                .set(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8")
+                .set(HttpHeaderNames.CONTENT_TYPE, contentType)
                 .setInt(HttpHeaderNames.CONTENT_LENGTH, contentBytes.length)
                 .set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_ORIGIN, "*"); // 允许跨域
 

@@ -14,6 +14,7 @@ import com.scutmmq.web.controller.data.DataStatisticsController;
 import com.scutmmq.web.controller.config.ConfigUpdateController;
 import com.scutmmq.web.controller.alarm.AlarmListController;
 import com.scutmmq.web.controller.alarm.AlarmHandleController;
+import com.scutmmq.web.controller.frontend.FrontendPageController;
 
 /**
  * Web Server 启动类
@@ -26,6 +27,10 @@ public class Application {
     public static void main(String[] args) throws Exception {
         // 1. 注册所有路由
         RestFulExpress router = RestFulExpress.instance();
+
+        // ===== 前端页面 =====
+        router.register("/", FrontendPageController.class);
+        router.register("/index.html", FrontendPageController.class);
         
         // ===== RTU 管理接口 =====
         router.register("/api/rtu/register", RtuRegisterController.class);
